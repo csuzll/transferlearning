@@ -1,96 +1,57 @@
 import os
 import cv2
-from imgaug import augmenters as iaa
+from multiprocessing import Pool
+from functools import partial
 
+# 数据处理步骤
+def pro(id, filepaths):
+    """
+    path: 图片路径
+    """
+    srcimg = cv2.imread(filepaths[id], cv2.IMREAD_GRAYSCALE)
 
-"""定义14种扩增方法"""
-# 1: 水平翻转
-aug1 = iaa.Fliplr(1.0)
+    # 1、对比度增强
+    srcimg_equalize = cv2.equalizeHist(srcimg)
 
-# 2: 上下翻转
-aug2 = iaa.Flipud(1.0)
+    # 2、缩放至256 * 256 
+    resize_img = cv2.resize(srcimg_equalize, (256,256), cv2.INTER_AREA)
 
-# 3: 按10%的比例裁剪
-aug3 = iaa.Crop(percent=0.1, keep_size=False)
+    # 3、变换为3通道
+    bgr_img = cv2.cvtColor(resize_img, cv2.COLOR_GRAY2BGR)
 
-# 4: 旋转180度
-aug4 = iaa.Affine(rotate=180)
+    # 4、保存
+    cv2.imwrite(filepaths[id], bgr_img)
 
-# 5: 旋转10度
-aug5 = iaa.Affine(rotate=10)
+# 处理所有数据
+def preprocess():
+    train_abnormal_dir = r"F:\data\chest_data\train\abnormal"
+    train_normal_dir = r"F:\data\chest_data\train\normal"
 
-# 6: 旋转-10度
-aug6 = iaa.Affine(rotate=-10)
+    val_abnormal_dir = r"F:\data\chest_data\val\abnormal"
+    val_normal_dir = r"F:\data\chest_data\val\normal"
 
-# 7: 弹性变换
-aug7 = iaa.ElasticTransformation(alpha=50.0, sigma=5.0)
+    test_abnormal_dir = r"F:\data\chest_data\test\abnormal"
+    test_normal_dir = r"F:\data\chest_data\test\normal"
 
-# 8: 按10%的比例裁剪+水平翻转
-aug8 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Fliplr(1.0)
-    ])
+    procdir = {0:train_abnormal_dir, 1:train_normal_dir, 2:val_abnormal_dir,
+               3:val_normal_dir, 4:test_abnormal_dir, 5:test_normal_dir}
 
-# 9: 按10%的比例裁剪+垂直翻转
-aug9 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Flipud(1.0)
-    ])
+    print("Start preprocessing chest_data......")
+    # 开启线程池
+    pool = Pool()
 
-# 10: 按10%的比例裁剪+旋转180度
-aug10 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Affine(rotate=180)
-    ])
+    # 6份数据
+    for i in range(6):
+        print("process " + procdir[i].split("\\",2)[-1])
+        filepaths = [os.path.join(procdir[i], file) for file in os.listdir(procdir[i])]
 
-# 11: 水平翻转+旋转180度
-aug11 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Affine(rotate=180)
-    ])
+        # 函数修饰
+        partial_pro = partial(pro, filepaths=filepaths)
 
-# 12: 垂直翻转+旋转180度
-aug12 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Affine(rotate=180)
-    ])
+        N = len(filepaths)
+        _ = pool.map(partial_pro, range(N))
+    pool.close() # 关闭线程池
+    pool.join()
 
-# 13: 按10%的比例裁剪+水平翻转+旋转180度
-aug13 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Fliplr(1.0),
-    iaa.Affine(rotate=180)
-    ])
-
-# 14: 按10%的比例裁剪+垂直翻转+旋转180度
-aug14 = iaa.Sequential([
-    iaa.Crop(percent=0.1, keep_size=False),
-    iaa.Flipud(1.0),
-    iaa.Affine(rotate=180)
-    ])
-
-auglist = [aug1,aug2,aug3,aug4,aug5,aug6,aug7,aug8,aug9,aug10,aug11,aug12,aug13,aug14]
-
-
-# 读取normal文件名
-with open("F:\\data\\chest_pro_data\\normal.txt", "r") as f:
-    lines = f.readlines() # 读取全部内容 ，并以列表方式返回
-    # 将文件按6个分为一批
-    f = lambda s, step:[s[i:i+step] for i in range(0, len(s), step)]
-    lines_six = f(lines, 6)
-
-
-
-
-# 将一张图片增强为14张,并保存
-def augment_one(imagepath):
-    # 读取为(H,W,C=3)的彩色图,（灰度图单纯复制3遍）
-    src_img = cv2.imread(imagepath)
-    for i,aug in enumerate(auglist):
-        image_aug = aug.augment_image(src_img)
-
-
-
-
-
-aug.augment_images(images)
+if __name__ == '__main__':
+    preprocess()
