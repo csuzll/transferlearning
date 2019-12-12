@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+import torch
 import torch.nn as nn
 from torchvision import models
 
@@ -17,9 +19,12 @@ def set_parameter_requires_grad(model, feature_extract):
 
 4、use_pretrained=False, feature_extract=True(不允许存在)
 """
+
 def initialize_model(model_name, num_classes, feature_extract=True, use_pretrained=True):
     """
-    model_name: 使用的模型名称，从此列表中选择[vgg16, resnet50, resnet101, resnext101, densenet161, inception]
+    model_name: 使用的模型名称，从此列表中选择
+                ["vgg16", "resnet50", "resnet101", "resnext101", "densenet161", "inception"]
+                "inception"的输入尺寸为229*229，其余为224*224
     num_classes: 数据集的类别数
     feature_extract: 特征提取(True)，微调(False)
     use_pretrained: 预训练(True)，从头开始训练(False)
@@ -86,7 +91,7 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
 
     elif model_name == "inception":
         """ 
-        inception v3
+        inception v3 
         训练时重塑辅助输出和主输出的分类层。        
         验证和测试时只考虑主输出。
         """
@@ -104,3 +109,26 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
         exit()
 
     return model_ft
+
+# 测试
+if __name__ == '__main__':
+    # 初始化模型（这里是预训练+特征提取模型）
+    model_ft = initialize_model(model_name="vgg16", num_classes=2, feature_extract=True, use_pretrained=True)
+    # 打印模型
+    print(model_ft)
+
+    # 输出模型requires_grad=True的参数名
+    for name, param in model_ft.named_parameters():
+        if param.requires_grad == True:
+            print("\t", name)
+
+    # 试着输入一个batch的数组
+    input = torch.randn(1,3,224,224)
+
+    with torch.no_grad():
+        output = model_ft(input)
+    print("output", out)
+
+    # 转为概率值
+    softmax_out = nn.functional.softmax(out, dim=1)
+    print("softmax_out", softmax_out)

@@ -59,11 +59,11 @@ def main():
 
     # 创建模型保存的地址
     if args.pretrained and args.feature:
-        mode = "Feature_extractor" # pretrained=True, feature=True
+        mode = "feature_extractor" # pretrained=True, feature=True
     elif args.pretrained and not args.feature:
-        mode = "Fine_tuning" # pretrained=True, feature=False
+        mode = "fine_tuning" # pretrained=True, feature=False
     else:
-        mode = "From_scratch" # pretrained=False, feature=False
+        mode = "from_scratch" # pretrained=False, feature=False
     modelpath = Path(args.output) / args.arch / mode
     modelpath.mkdir(exist_ok=True, parents=True)
 

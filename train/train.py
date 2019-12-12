@@ -3,7 +3,6 @@ import time
 import copy
 import tqdm
 import torch
-import torch.nn as nn
 import numpy as np
 from pathlib import Path
 from torchnet import meter
@@ -25,45 +24,51 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
     is_inception: 是否为inception模型的标志
     """
 
+    # 训练周期数
+    epochs = epochs or args.epochs
+
     # 模型保存地址
     if args.pretrained and args.feature:
-        mode = "Feature_extractor" # pretrained=True, feature=True
+        mode = "feature_extractor" # pretrained=True, feature=True
     elif args.pretrained and not args.feature:
-        mode = "Fine_tuning" # pretrained=True, feature=False
+        mode = "fine_tuning" # pretrained=True, feature=False
     else:
-        mode = "From_scratch" # pretrained=False, feature=False
-    modelpath = Path(args.output) / args.arch / mode / "model.pt"
-    bestmodelpath = Path(args.output) / args.arch / mode / "bestmodel.pt"
+        mode = "from_scratch" # pretrained=False, feature=False
+    # 模型保存地址
+    model_path = Path(args.output) / args.arch / mode / "model.pt"
+    # 准确率最好的模型保存地址
+    best_modelpath = Path(args.output) / args.arch / mode / "bestmodel.pt"
 
     # 断点训练
-    if (modelpath.exists()):
-        state = torch.load(str(modelpath))
+    if (model_path.exists()):
+        state = torch.load(str(model_path))
+
         epoch = state["epoch"]
         model.load_state_dict(state["model"])
         best_acc = state["best_acc"]
+
         logger.info("Loading epoch {} checkpoint ...".format(epoch))
-        print('Restored model, epoch {}, step {:,}'.format(epoch, step))
+        print("Restored model, epoch {}".format(epoch))
     else:
         epoch = 0
         best_acc = float('inf')
 
     # save匿名函数，使用的时候就调用save(ep)
     save = lambda epoch: torch.save({
-        'model':model.state_dict(),
-        'epoch':epoch,
-        'best_acc': best_acc,
-        }, str(modelpath))
+        "model":model.state_dict(),
+        "epoch":epoch,
+        "best_acc": best_acc,
+        }, str(model_path))
 
-
-    # best_model_wts = copy.deepcopy(model.state_dict())
-    # best_acc = 0.0
-
-    # since = time.time()
-    # meters
+    # meters训练指标
     running_loss_meter = meter.AverageValueMeter() # 平均值loss
-    running_corrects_meter = meter.mAPMeter() # 所有类的平均正确率
-    # running_corrects = meter.ClassErrorMeter(topk=[1], accuracy=True) # 每个类的正确率
+    # running_corrects_meter = meter.mAPMeter() # 所有类的平均正确率
+    running_corrects_meter = meter.ClassErrorMeter(topk=[1], accuracy=True) # 正确率
     time_meter = meter.TimeMeter(unit=True)  # 测量训练时间
+
+    # 结果记录文件
+    resultpath = Path(args.output) / args.arch / mode / "result.pkl"
+    result_writer = ResultsWriter(resultpath, overwrite=False)
 
     for epoch in range(epoch, epochs):
         print("Epoch {}/{}".format(epoch, epochs-1))
@@ -121,9 +126,6 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
                     running_loss_meter.add(loss.item())
                     running_corrects_meter.add(outputs.detach(), labels.detach())
 
-                    # running_loss += loss.item() * inputs.size(0)
-                    # running_corrects += torch.sum(preds == labels.data)
-
                 # 学习率调整
                 if phase == "train":
                     # 更新学习率
@@ -131,24 +133,30 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
                     save(epoch+1)
 
                 tq.close()
-                print("{} Loss: {:.4f} Acc: {:.4f}".format(phase, epoch_loss, epoch_acc))
+                print("{} Loss: {:.4f} Acc: {:.4f}".format(phase, running_loss_meter.value()[0], running_corrects_meter.value()))
 
-                # # 1个epoch的统计
-                # epoch_loss = running_loss / len(dataloaders[phase].datasets)
-                # epoch_acc = running_corrects.double() / len(dataloaders[phase].datasets)
+                # copy the bestmodel
+                if phase == "val" and running_corrects_meter.value() > best_acc:
+                    best_acc = running_corrects_meter.value()
+                    shutil.copy(str(model_path), str(best_modelpath))
 
-                # deep copy the model
-                if phase == "val" and running_corrects_meter.value()[0] > best_acc:
-                    best_acc = running_corrects_meter.value()[0]
-                    shutil.copy(str(modelpath), str(bestmodelpath))
+                # 记录到日志中
+                logger.info("\n phase: {phase}, epoch: {epoch}, lr: {lr}, loss: {loss}, accuracy: {accuracy}".format(
+                    phase = phase, epoch = epoch+1, lr = scheduler.get_lr(),
+                    loss = running_loss_meter.value()[0], accuracy = running_corrects_meter.value()))
 
+                # ResultWriter记录
+                result_writer.update(epoch, {"phase":phase, "loss": running_loss_meter.value()[0],
+                    "accuracy":running_corrects_meter.value()})
+
+            except KeyboardInterrupt:
+                tq.close()
+                print("Ctrl+C", saving snapshot)
+                save(epoch)
 
         print()
 
-    time_elapsed = time.time() - since
-    print("Training complete in {:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60))
+    # 训练所用时间
+    time_elapsed = time_meter.value()
+    print("Training complete in {:.0f}m {:.0f}s".format(time_elapsed, time_elapsed))
     print("Best val Acc: {:.4f}".format(best_acc))
-
-    # load best model weights
-    model.load_state_dict(best_model_wts)
-    return model, val_acc_history

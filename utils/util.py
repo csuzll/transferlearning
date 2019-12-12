@@ -1,8 +1,8 @@
+# -*- coding: utf-8 -*-
+import os
 import logging
 from logging import Logger
-from utils.util import ensure_dir
 from logging.handlers import TimedRotatingFileHandler
-import os
 
 '''
 日志模块
@@ -11,7 +11,8 @@ import os
 '''
 
 def init_logger(log_name,log_path):
-    ensure_dir(log_path)
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
     if log_name not in Logger.manager.loggerDict:
         logger  = logging.getLogger(log_name)
         logger.setLevel(logging.DEBUG)
