@@ -124,6 +124,8 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
 
                     # 一次迭代的更新
                     running_loss_meter.add(loss.item())
+                    # 模型的输出非概率，所以需要转变为概率
+                    out_prob = 
                     running_corrects_meter.add(outputs.detach(), labels.detach())
 
                 # 学习率调整
