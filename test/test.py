@@ -2,21 +2,14 @@
 import sys
 import args
 import torch
-import cv2
-import numpy as np
+import torch.nn.functional as F
 from tqdm import tqdm
 from pathlib import Path
 from torch.utils.data import DataLoader
 import torchvision.models as models, datasets, transforms
 from model.model import initialize_model
 from torchnet import meter
-
-def write_csv(results, file_name):
-    import csv
-    with open(str(file_name),'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(['id','label'])
-        writer.writerows(results)
+from torchnet.utils import ResultsWriter
 
 # 获取测试模型
 def get_testmodel(model_path, model_name, num_classes):
@@ -39,14 +32,14 @@ def get_testmodel(model_path, model_name, num_classes):
 
     return model
 
-def test(model, dataloader, num_workers, batch_size, result_path):
+# 测试函数
+def test(model, dataloader, num_workers, batch_size, resultpath):
     print("num test = {}".format(len(dataloader.dataset)))
-    
-    results = []
 
     # 测试指标
     test_acc = meter.ClassErrorMeter(topk=[1], accuracy=True) # 整个测试数据集的正确率
     test_ap = meter.APMeter() # 每一类的精度
+    result_writer = ResultsWriter(str(resultpath), overwrite=False)
 
     with torch.no_grad():
 
@@ -60,14 +53,15 @@ def test(model, dataloader, num_workers, batch_size, result_path):
             # outputs[B,numclasses]
             outputs = model(inputs)
 
-            # 我觉得output应该做一个softmax(弄成概率)
-
             # 计算指标
-            test_acc.add(outputs.detach(), labels.detach())
-            test_ap.add(outputs.detach(), labels.detach())
+            pred_proc = F.softmax(outputs.detach(), dim=1)
+            test_acc.add(pred_proc, labels.detach())
+            test_ap.add(pred_proc, labels.detach())
 
-    return test_acc test_ap
+    # 记录保存
+    result_writer.update("test", {"acc": test_acc.value(), "ap":test_ap.value()})
 
+    return test_acc, test_ap
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -117,10 +111,10 @@ if __name__ == "__main__":
         pin_memory=torch.cuda.is_available()
         )
 
+    # 输出结果保存地址
+    resultpath = model_path.parent / "test_result.pkl"
+
     # 执行测试
-
-
-    results_filename = "results.csv"
-    results_path = 
-
-    results = test(model, datapath, args.num_workers, args.batch_size, results_path)
+    test_acc, test_ap = test(model, dataloader, args.num_workers, args.batch_size, resultpath)
+    print("test_acc", test_acc.value())
+    print("test_ap", test_ap.value())

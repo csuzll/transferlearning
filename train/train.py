@@ -3,6 +3,7 @@ import time
 import copy
 import tqdm
 import torch
+import torch.nn.functional as F
 import numpy as np
 from pathlib import Path
 from torchnet import meter
@@ -112,8 +113,6 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
                             outputs = model(inputs)
                             loss = criterion(outputs, labels) # 计算loss
 
-                        _, preds = torch.max(outputs, 1)
-
                         # backward + optimize only if in training phase
                         if phase == "train":
                             # 反向传播
@@ -124,9 +123,7 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
 
                     # 一次迭代的更新
                     running_loss_meter.add(loss.item())
-                    # 模型的输出非概率，所以需要转变为概率
-                    out_prob = 
-                    running_corrects_meter.add(outputs.detach(), labels.detach())
+                    running_corrects_meter.add(F.softmax(output.detach(), dim=1)., labels.detach())
 
                 # 学习率调整
                 if phase == "train":
