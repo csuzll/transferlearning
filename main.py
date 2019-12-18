@@ -9,7 +9,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets, models, transforms
+from torchvision import datasets, transforms
 from model.model import initialize_model
 from train.train import train
 from utils.util import init_logger
@@ -26,7 +26,7 @@ def boolean_string(s):
 parser = argparse.ArgumentParser(description='PyTorch ChestData Training')
 arg = parser.add_argument
 
-# 数据集地址(--data transferlearing/chest_data)
+# 数据集地址(--data home/zhanglanlan/data/chest_data)
 arg("--data", metavar="DIR", type=str, default="chest_data", help="path to dataset.") 
 # 模型名称(--arch vgg16)
 arg("--arch", metavar="ARCH", choices=model_names, help="model architecture: " + " | ".join(model_names) + " (default: vgg16)") 
@@ -46,12 +46,10 @@ arg("--lr", type=float, default=0.001, metavar="LR", help="initial learning rate
 arg("--device-ids", type=str, default="0", help="For example 0,1 to run on two GPUs.")
 # 初始化种子随机数(--seed 42)
 arg("--seed", default=42, type=int, help="seed for initializing training.")
-
-# arg("--weight-decay", default=1e-4, type=float, metavar="W", help="weight decay (default: 1e-4)")
-# arg("--print-freq", default=10, type=int, metavar="N", help="print frequency (default: 10)")
-
 # 模型保存位置(--output output)
 arg("--output", default="output", help="model and test result storage location.")
+
+# arg("--weight-decay", default=1e-4, type=float, metavar="W", help="weight decay (default: 1e-4)")
 
 def main():
     # 只能在命令行模式下运行
@@ -139,7 +137,7 @@ def main():
     # 将args写入json
     modelpath.joinpath("params.json").write_text(json.dumps(vars(args), indent=True, sort_keys=True))
 
-    # 定义损失函数
+    # 定义损失函数(这个损失函数包含了将输出转换为概率的对数即log_softmax，所以，构建模型时不需要softmax层)
     criterion = nn.CrossEntropyLoss()
 
     # 收集要更新的参数,由于前面将model并行了，模型参数名称都加上了module
@@ -152,8 +150,12 @@ def main():
     else:
         params_to_update = model_ft.parameters()
 
-    # 优化器
+    # 优化器（带动量的SGD）
     optimizer = torch.optim.SGD(params_to_update, lr=args.lr, momentum=0.9)
+    # # RMSprop
+    # optimizer = torch.optim.RMSprop(params_to_update, lr=args.lr, alpha=0.9)
+    # # Adam
+    # optimizer = torch.optim.Adam(params_to_update, lr=args.lr, betas=(0.9, 0.99))
 
     # 学习率调整器
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
@@ -167,7 +169,7 @@ def main():
         scheduler = scheduler,
         logger = logger,
         epochs = args.epochs,
-        is_inception = (args.arch=="inception")
+        is_inception = (args.arch == "inception")
         )
 
 if __name__ == '__main__':

@@ -56,6 +56,7 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
         """
         model_ft = models.resnet50(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
+        # alter fc
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
 
@@ -66,6 +67,7 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
         """
         model_ft = models.resnet101(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
+        # alter fc
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
 
@@ -76,6 +78,7 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
         """
         model_ft = models.resnetxt101_32x8d(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
+        # alter fc
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
 
@@ -86,6 +89,7 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
         """
         model_ft = models.densenet161(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
+        # alter fc
         num_ftrs = model_ft.fc.in_features
         model_ft.classifier = nn.Linear(num_ftrs, num_classes)
 
@@ -100,7 +104,7 @@ def initialize_model(model_name, num_classes, feature_extract=True, use_pretrain
         # 处理辅助网络AuxLogits部分
         num_ftrs = model_ft.AuxLogits.fc.in_features
         model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
-        # 处理主要网络
+        # 处理主要网络的fc层
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
 

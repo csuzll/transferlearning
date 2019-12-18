@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
-import time
-import copy
 import tqdm
 import torch
 import torch.nn.functional as F
-import numpy as np
 from pathlib import Path
 from torchnet import meter
 from torchnet.utils import ResultsWriter

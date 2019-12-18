@@ -38,6 +38,7 @@ def init_logger(log_name,log_path):
     logger = logging.getLogger(log_name)
     return logger
 
+# 测试
 if __name__ == "__main__":
     logger = init_logger('test','D:\\data')
     logger.info("test")
