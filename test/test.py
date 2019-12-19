@@ -36,9 +36,23 @@ def get_testmodel(model_path, model_name, num_classes):
 def test(model, dataloader, num_workers, batch_size, resultpath):
     print("num test = {}".format(len(dataloader.dataset)))
 
-    # 测试指标
-    test_acc = meter.ClassErrorMeter(topk=[1], accuracy=True) # 整个测试数据集的正确率
-    test_ap = meter.APMeter() # 每一类的精度
+    """
+    测试指标：
+    1、 准确率(Accuracy): 模型预测正确样本数占总样本数的比例。test_acc
+    2、 各个类的精度: 模型对各个类别的预测准确率。
+    3、 AUC
+    4、 混淆矩阵: 用于计算各种指标（包括灵敏性，特异性等）
+    """
+    # 整个测试数据集的准确率
+    test_acc = meter.ClassErrorMeter(topk=[1], accuracy=True)
+    # 每一类的精度
+    test_ap = meter.APMeter() 
+    # AUC指标，AUC要求输入样本预测为正例的概率
+    """根据我的数据集文件命名，0表示阴性，1表示阳性（即1表示正例）"""
+    test_auc = meter.AUCMeter() 
+    # 混淆矩阵
+    test_conf = meter.ConfusionMeter(k=2, normalized=False)
+
     result_writer = ResultsWriter(str(resultpath), overwrite=False)
 
     with torch.no_grad():
@@ -57,11 +71,21 @@ def test(model, dataloader, num_workers, batch_size, resultpath):
             pred_proc = F.softmax(outputs.detach(), dim=1)
             test_acc.add(pred_proc, labels.detach())
             test_ap.add(pred_proc, labels.detach())
+            # 取出正例即1（患病）的概率
+            test.auc.add(pred_proc[:1], labels.detach())
+            test_conf.add(pred_proc, labels.detach())
 
-    # 记录保存
-    result_writer.update("test", {"acc": test_acc.value(), "ap":test_ap.value()})
+    # 记录保存, 便于evaluate.py计算和画图一些结果
+    result_writer.update("test", 
+        {"acc": test_acc.value(), 
+         "ap":test_ap.value(), 
+         "test_auc":test_auc.value()[0],
+         "test_tpr":test_auc.value()[1],
+         "test_fpr":test_auc.value()[2],
+         "test_conf":test_conf.value()
+         })
 
-    return test_acc, test_ap
+    return test_acc, test_ap, test_auc
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -118,3 +142,4 @@ if __name__ == "__main__":
     test_acc, test_ap = test(model, dataloader, args.num_workers, args.batch_size, resultpath)
     print("test_acc", test_acc.value())
     print("test_ap", test_ap.value())
+    print("test_auc", test_auc.value()[0])

@@ -41,5 +41,5 @@ def init_logger(log_name,log_path):
 # 测试
 if __name__ == "__main__":
     logger = init_logger('test','D:\\data')
-    logger.info("test")
-    logger.error("test2")
+    # logger.info("test")
+    # logger.error("test2")

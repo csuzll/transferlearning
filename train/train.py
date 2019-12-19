@@ -14,7 +14,7 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
     args: 从键盘接收的参数
     model: 将被训练的模型
     dataloaders: 数据加载器
-    criterion: 优化准则（loss）
+    criterion: 损失函数
     optimizer: 训练时的优化器
     scheduler: 学习率调整机制
     logger: 日志
@@ -58,14 +58,14 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
         "best_acc": best_acc,
         }, str(model_path))
 
-    # meters训练指标
+    # 训练指标
     running_loss_meter = meter.AverageValueMeter() # 平均值loss
-    # running_corrects_meter = meter.mAPMeter() # 所有类的平均正确率
-    running_corrects_meter = meter.ClassErrorMeter(topk=[1], accuracy=True) # 正确率
+    # running_acc_meter = meter.mAPMeter() # 所有类的平均正确率
+    running_acc_meter = meter.ClassErrorMeter(topk=[1], accuracy=True) # 准确率
     time_meter = meter.TimeMeter(unit=True)  # 测量训练时间
 
     # 结果记录文件
-    resultpath = Path(args.output) / args.arch / mode / "result.pkl"
+    resultpath = Path(args.output) / args.arch / mode / "train_result.pkl"
     result_writer = ResultsWriter(resultpath, overwrite=False)
 
     for epoch in range(epoch, epochs):
@@ -81,7 +81,7 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
 
             # 每个epoch的train和val阶段分别重置
             running_loss_meter.reset()
-            running_corrects_meter.reset()
+            running_acc_meter.reset()
 
             random.seed(args.seed)
             tq = tqdm.tqdm(total=len(dataloaders[phase].datasets))
@@ -116,34 +116,36 @@ def train(args, model, dataloaders, criterion, optimizer, scheduler, logger, epo
                             loss.backward()
                             # 更新权值参数
                             optimizer.step()
+
                     tq.update(inputs.size(0))
 
-                    # 一次迭代的更新
+                    # 一次迭代(step)的更新
                     running_loss_meter.add(loss.item())
-                    running_corrects_meter.add(F.softmax(output.detach(), dim=1)., labels.detach())
+                    running_acc_meter.add(F.softmax(output.detach(), dim=1), labels.detach())
 
-                # 学习率调整
+                # 学习率调整(按epoch调整)
                 if phase == "train":
                     # 更新学习率
                     scheduler.step()
                     save(epoch+1)
 
                 tq.close()
-                print("{} Loss: {:.4f} Acc: {:.4f}".format(phase, running_loss_meter.value()[0], running_corrects_meter.value()))
+                print("{} Loss: {:.4f} Acc: {:.4f}".format(phase, running_loss_meter.value()[0], running_acc_meter.value()))
 
                 # copy the bestmodel
-                if phase == "val" and running_corrects_meter.value() > best_acc:
-                    best_acc = running_corrects_meter.value()
+                if phase == "val" and running_acc_meter.value() > best_acc:
+                    best_acc = running_acc_meter.value()
                     shutil.copy(str(model_path), str(best_modelpath))
 
+                """记录epoch的loss和acc，不记录step的"""
                 # 记录到日志中
-                logger.info("\n phase: {phase}, epoch: {epoch}, lr: {lr}, loss: {loss}, accuracy: {accuracy}".format(
+                logger.info("\n phase: {phase}, epoch: {epoch}, lr: {lr}, loss: {loss}, acc: {acc}".format(
                     phase = phase, epoch = epoch+1, lr = scheduler.get_lr(),
-                    loss = running_loss_meter.value()[0], accuracy = running_corrects_meter.value()))
+                    loss = running_loss_meter.value()[0], acc = running_acc_meter.value()))
 
                 # ResultWriter记录
                 result_writer.update(epoch, {"phase":phase, "loss": running_loss_meter.value()[0],
-                    "accuracy":running_corrects_meter.value()})
+                    "acc":running_acc_meter.value()})
 
             except KeyboardInterrupt:
                 tq.close()
