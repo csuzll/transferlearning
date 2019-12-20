@@ -71,7 +71,7 @@ def test(model, dataloader, num_workers, batch_size, resultpath):
             pred_proc = F.softmax(outputs.detach(), dim=1)
             test_acc.add(pred_proc, labels.detach())
             test_ap.add(pred_proc, labels.detach())
-            # 取出正例即1（患病）的概率
+            # 取出output第1列的数，正例即1（患病）的概率
             test.auc.add(pred_proc[:1], labels.detach())
             test_conf.add(pred_proc, labels.detach())
 
@@ -106,10 +106,10 @@ if __name__ == "__main__":
         help="mini-batch size (default: 2), this is the total batch size of all GPUs on the current node when using Data Parallel")
 
     model_path = Path(args.model_path)
+
     # 模型地址不是一个文件 或者模型地址与模型架构不一致退出
-    if not model_path.is_file() or model_path.parent.parent.name != args.arch:
-        print("Please check you command")
-        sys.exit()
+    assert model_path.is_file(), "模型地址不是一个文件"
+    assert model_path.parent.parent.name == args.arch, "模型与输入的模型不匹配"
 
     # 获取测试模型
     model = get_testmodel(args.model_path, args.arch, 2)

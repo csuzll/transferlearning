@@ -37,3 +37,13 @@ def f1_score(precision, recall):
 
 # 绘制ROC曲线（横轴fpr, 纵轴tpr）
 # plt.plot(fpr, tpr)
+
+from pathlib import Path
+import pickle as pk
+
+if __name__ == '__main__':
+    
+    # 读取文件
+    paths = ""
+    with open(paths, "rb") as f:
+        data = pk.load(f)
